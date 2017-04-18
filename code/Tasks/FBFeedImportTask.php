@@ -28,9 +28,9 @@ class FBFeedImportTask extends BuildTask
 
         $storedPosts = $this->fbService->getStoredPosts();
         $posts = $this->fbService->getPostsFromFacebook();
-
+        // print_r($posts);
         $inserted = 0;
-        //Debug::show($posts);
+   
         foreach ($posts as $i => $post) {
             if (!isset($post['FBID'])) break;
 

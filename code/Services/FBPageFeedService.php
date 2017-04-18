@@ -2,9 +2,9 @@
 
 namespace Olliepop\FBPageFeed;
 
-use Facebook\FacebookSession;
-use Facebook\FacebookRequest;
-use Facebook\FacebookRequestException;
+use Facebook;
+use Facebook\Exceptions\FacebookSDKException;
+use Facebook\Exceptions\FacebookResponseException;
 
 /**
  * Class FBPageFeedService
@@ -14,9 +14,9 @@ class FBPageFeedService
 {
 
     /**
-     * @var \Facebook\FacebookSession
+     * @var \Facebook\Facebook
      */
-    private $fbSession;
+    private $fb;
     /**
      * @var mixed
      */
@@ -50,8 +50,14 @@ class FBPageFeedService
         $this->appSecret = $siteConfig->FBAppSecret;
         $this->accessToken = $siteConfig->FBAccessToken;
 
-        FacebookSession::setDefaultApplication($this->appID, $this->appSecret);
-        $this->fbSession = new FacebookSession($this->accessToken);
+        $fb = new Facebook\Facebook([
+          'app_id'     => $this->appID,
+          'app_secret' => $this->appSecret,
+          'default_graph_version' => 'v2.8',
+          ]);
+
+        $fb->setDefaultAccessToken($this->accessToken);
+        $this->fb = $fb;
 
     }
 
@@ -98,62 +104,56 @@ class FBPageFeedService
     public function getPostsFromFacebook($limit = 4)
     {
         $posts = array();
-
-        try {
-
-            $request = new FacebookRequest(
-                $this->fbSession,
-                'GET',
-                '/' . $this->pageID . '/feed'
-            );
-            // print_r($request);
-            $response = $request->execute();
-            $pagefeed = $response->getResponse();
-
-            foreach($pagefeed->data as $iteration=>$responseData) {
-
+        $fb = $this->fb;
+        try {   
+            $response = $fb->get('/' . $this->pageID . '/feed?fields=id,message,link,object_id,created_time,type,picture');
+            $pagefeed = $response->getDecodedBody();
+            //print_r($pagefeed['data']);
+            foreach($pagefeed['data'] as $iteration=>$responseData) {
+                //print_r($responseData);
                 if($iteration==$limit) break;
 
-                if(isset($responseData->message)) {
-                    $posts[$iteration]['Content'] = $responseData->message;
-                    $posts[$iteration]['FBID'] = $responseData->id;
-                    $posts[$iteration]['URL'] = $responseData->link;
-                    $posts[$iteration]['source'] = $responseData->picture;
-                    $posts[$iteration]['TimePosted'] = $responseData->created_time;
+                if(isset($responseData['message'])) {
+
+                    $posts[$iteration]['Content'] = $responseData['message'];
+                    $posts[$iteration]['FBID'] = $responseData['id'];
+                    $posts[$iteration]['URL'] = $responseData['link'];
+                    $posts[$iteration]['source'] = $responseData['picture'];
+                    $posts[$iteration]['TimePosted'] = $responseData['created_time'];
                 }
 
-                if($responseData->type == "photo") {
-                    if(isset($responseData->object_id)) {
-                        $subRequest = new FacebookRequest(
-                            $this->fbSession,
-                            'GET',
-                            '/' . $responseData->object_id . '?fields=images'
-                        );
-                        $subResponse = $subRequest->execute()->getResponse();
+                if($responseData['type'] == "photo") {
+                    if(isset($responseData['object_id'])) {
 
+                        $subRequest = $fb->get( '/' . $responseData['object_id'] . '?fields=images');
+                           
+                        $subResponse = $subRequest->getDecodedBody();
+                        //print_r($subResponse);
                         // Get the largest image for best quality
-                        $images = $subResponse->images;
+                        $images = $subResponse['images'];
                         $largestWidth = 0;
                         $largestIndex = 0;
                         // Loop through each supplied image object, remembering the largest
                         foreach($images as $index=>$image) {
-                            if($image->width > $largestWidth) {
+                            if($image['width'] > $largestWidth) {
                                 $largestIndex = $index;
-                                $largestWidth = $image->width;
+                                $largestWidth = $image['width'];
                             }
                         }
+                        //print_r($images);
                         // Cherry-pick the source of the largest image asset
-                        $posts[$iteration]['source'] = $images{$largestIndex}->source;
+                        $posts[$iteration]['source'] = $images{$largestIndex}['source'];
                     }
                 }
 
             }
+          
             return $posts;
-        } catch (FacebookRequestException $e) {
+        } catch (FacebookResponseException $e) {
             // The Graph API returned an error
             error_log('Olliepop\LGPageFeed SilverStripe Module Exception #1: ' . $e);
-        } catch (\Exception $e) {
-            // Some other error occurred
+        } catch (FacebookSDKException $e) {
+            // Some othFacebookSDKExceptioner error occurred
             error_log('Olliepop\LGPageFeed SilverStripe Module Exception #2: ' . $e);
         }
 
