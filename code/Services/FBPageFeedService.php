@@ -100,11 +100,13 @@ class FBPageFeedService
         $posts = array();
 
         try {
+
             $request = new FacebookRequest(
                 $this->fbSession,
                 'GET',
                 '/' . $this->pageID . '/feed'
             );
+            // print_r($request);
             $response = $request->execute();
             $pagefeed = $response->getResponse();
 
@@ -114,8 +116,9 @@ class FBPageFeedService
 
                 if(isset($responseData->message)) {
                     $posts[$iteration]['Content'] = $responseData->message;
-                    $posts[$iteration]['FBID'] = $responseData->object_id;
+                    $posts[$iteration]['FBID'] = $responseData->id;
                     $posts[$iteration]['URL'] = $responseData->link;
+                    $posts[$iteration]['source'] = $responseData->picture;
                     $posts[$iteration]['TimePosted'] = $responseData->created_time;
                 }
 
