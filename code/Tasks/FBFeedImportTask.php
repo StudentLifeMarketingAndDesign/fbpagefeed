@@ -34,7 +34,7 @@ class FBFeedImportTask extends BuildTask
         foreach ($posts as $i => $post) {
             if (!isset($post['FBID'])) break;
 
-            $existingPost = FacebookPost::get()->filter('URL', $post['URL'])->first();
+            $existingPost = FacebookPost::get()->filter('FBID', $post['FBID'])->first();
 
             if ($existingPost) {
                 break;
